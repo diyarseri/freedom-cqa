@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "invalid_judgment",
+    "message": "Numeric value is not an allowed scale value.",
+    "details": [
+      {
+        "path": "judgments[3].numeric_value",
+        "message": "Allowed: 0, 5, 10, 15, 20"
+      }
+    ]
+  },
+  "request_id": "req_demo"
+}

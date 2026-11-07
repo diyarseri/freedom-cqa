@@ -1,0 +1,41 @@
+{
+  "conversation_id": "conv_demo",
+  "source": {
+    "kind": "dataset",
+    "group_id": "DEMO",
+    "conversation_id": "demo-ru-001"
+  },
+  "channel": "agent chat",
+  "language": "RU",
+  "audio_url": null,
+  "messages": [
+    {
+      "message_id": "msg_demo_1",
+      "ordinal": 1,
+      "timestamp": "00:00",
+      "speaker": "client",
+      "text": "Здравствуйте, где посмотреть тарифы?"
+    },
+    {
+      "message_id": "msg_demo_2",
+      "ordinal": 2,
+      "timestamp": "00:02",
+      "speaker": "operator",
+      "text": "Здравствуйте! Я Анна. Тарифы доступны в разделе «Тарифы» приложения."
+    },
+    {
+      "message_id": "msg_demo_3",
+      "ordinal": 3,
+      "timestamp": "00:04",
+      "speaker": "client",
+      "text": "Спасибо."
+    },
+    {
+      "message_id": "msg_demo_4",
+      "ordinal": 4,
+      "timestamp": "00:05",
+      "speaker": "system",
+      "text": "Чат закрыт."
+    }
+  ]
+}

@@ -1,0 +1,433 @@
+{
+  "evaluation_id": "eval_demo",
+  "conversation_id": "conv_demo",
+  "checklist_id": "checklist_seed",
+  "checklist_version": 1,
+  "status": "succeeded",
+  "provider": {
+    "name": "fixture",
+    "model": "illustrative",
+    "error": null
+  },
+  "created_at": "2026-11-07T08:00:00Z",
+  "completed_at": "2026-11-07T08:00:01Z",
+  "revision": 3,
+  "original_ai_result": {
+    "judgments": [
+      {
+        "criterion_id": "c01",
+        "answer": "yes",
+        "numeric_value": null,
+        "rationale": "Оператор поздоровался и представился.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c02",
+        "answer": "na",
+        "numeric_value": null,
+        "rationale": "Общий вопрос о тарифах ясен с самого начала.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_1"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c03",
+        "answer": "na",
+        "numeric_value": null,
+        "rationale": "Общий вопрос о тарифах не требует идентификации.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_1"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c04",
+        "answer": "numeric",
+        "numeric_value": 20,
+        "rationale": "Указан корректный следующий шаг (демонстрационное суждение).",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c05",
+        "answer": "yes",
+        "numeric_value": null,
+        "rationale": "Оператор отвечает вежливо.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c06",
+        "answer": "numeric",
+        "numeric_value": 10,
+        "rationale": "Ответ ясен и связен.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c07",
+        "answer": "no",
+        "numeric_value": null,
+        "rationale": "Оператор не попрощался до закрытия чата.",
+        "evidence": {
+          "message_ids": [],
+          "inspected_ranges": [
+            {
+              "start_message_id": "msg_demo_1",
+              "end_message_id": "msg_demo_4"
+            }
+          ]
+        }
+      },
+      {
+        "criterion_id": "c08",
+        "answer": "no",
+        "numeric_value": null,
+        "rationale": "В проверенном диалоге ни одно из трёх нарушений не выявлено.",
+        "evidence": {
+          "message_ids": [],
+          "inspected_ranges": [
+            {
+              "start_message_id": "msg_demo_1",
+              "end_message_id": "msg_demo_4"
+            }
+          ]
+        }
+      }
+    ],
+    "scores": [
+      {
+        "criterion_id": "c01",
+        "weight": 10,
+        "raw_points": 10,
+        "effective_weight": 15.384615384615385,
+        "points": 15.384615384615385
+      },
+      {
+        "criterion_id": "c02",
+        "weight": 15,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      },
+      {
+        "criterion_id": "c03",
+        "weight": 20,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      },
+      {
+        "criterion_id": "c04",
+        "weight": 20,
+        "raw_points": 20.0,
+        "effective_weight": 30.76923076923077,
+        "points": 30.76923076923077
+      },
+      {
+        "criterion_id": "c05",
+        "weight": 15,
+        "raw_points": 15,
+        "effective_weight": 23.076923076923077,
+        "points": 23.076923076923077
+      },
+      {
+        "criterion_id": "c06",
+        "weight": 15,
+        "raw_points": 15.0,
+        "effective_weight": 23.076923076923077,
+        "points": 23.076923076923077
+      },
+      {
+        "criterion_id": "c07",
+        "weight": 5,
+        "raw_points": 0,
+        "effective_weight": 7.6923076923076925,
+        "points": 0.0
+      },
+      {
+        "criterion_id": "c08",
+        "weight": 0,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      }
+    ],
+    "sections": [
+      {
+        "section_id": "start",
+        "points": 15.384615384615385,
+        "maximum": 15.384615384615385
+      },
+      {
+        "section_id": "safety",
+        "points": 30.76923076923077,
+        "maximum": 30.76923076923077
+      },
+      {
+        "section_id": "dialogue",
+        "points": 46.15384615384615,
+        "maximum": 53.84615384615385
+      },
+      {
+        "section_id": "gross",
+        "points": null,
+        "maximum": null
+      }
+    ],
+    "applicable_weight": 65,
+    "total": 92.31,
+    "total_unavailable_reason": null,
+    "gross_error": false
+  },
+  "appeals": [
+    {
+      "appeal_id": "appeal_demo",
+      "evaluation_id": "eval_demo",
+      "criterion_id": "c07",
+      "comment": "Клиент завершил разговор сам, у оператора не было возможности попрощаться.",
+      "evidence": {
+        "message_ids": [
+          "msg_demo_3",
+          "msg_demo_4"
+        ],
+        "inspected_ranges": []
+      },
+      "status": "resolved",
+      "created_at": "2026-11-07T08:01:00Z",
+      "decision": {
+        "decision_id": "decision_demo",
+        "action": "change",
+        "reason": "Для демонстрации: подтверждена неприменимость завершения.",
+        "replacement": {
+          "criterion_id": "c07",
+          "answer": "na",
+          "numeric_value": null,
+          "rationale": "Чат оборвался до возможности завершения.",
+          "evidence": {
+            "message_ids": [],
+            "inspected_ranges": [
+              {
+                "start_message_id": "msg_demo_1",
+                "end_message_id": "msg_demo_4"
+              }
+            ]
+          }
+        },
+        "created_at": "2026-11-07T08:02:00Z"
+      }
+    }
+  ],
+  "final_result": {
+    "judgments": [
+      {
+        "criterion_id": "c01",
+        "answer": "yes",
+        "numeric_value": null,
+        "rationale": "Оператор поздоровался и представился.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c02",
+        "answer": "na",
+        "numeric_value": null,
+        "rationale": "Общий вопрос о тарифах ясен с самого начала.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_1"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c03",
+        "answer": "na",
+        "numeric_value": null,
+        "rationale": "Общий вопрос о тарифах не требует идентификации.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_1"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c04",
+        "answer": "numeric",
+        "numeric_value": 20,
+        "rationale": "Указан корректный следующий шаг (демонстрационное суждение).",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c05",
+        "answer": "yes",
+        "numeric_value": null,
+        "rationale": "Оператор отвечает вежливо.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c06",
+        "answer": "numeric",
+        "numeric_value": 10,
+        "rationale": "Ответ ясен и связен.",
+        "evidence": {
+          "message_ids": [
+            "msg_demo_2"
+          ],
+          "inspected_ranges": []
+        }
+      },
+      {
+        "criterion_id": "c07",
+        "answer": "na",
+        "numeric_value": null,
+        "rationale": "Чат оборвался до возможности завершения.",
+        "evidence": {
+          "message_ids": [],
+          "inspected_ranges": [
+            {
+              "start_message_id": "msg_demo_1",
+              "end_message_id": "msg_demo_4"
+            }
+          ]
+        }
+      },
+      {
+        "criterion_id": "c08",
+        "answer": "no",
+        "numeric_value": null,
+        "rationale": "В проверенном диалоге ни одно из трёх нарушений не выявлено.",
+        "evidence": {
+          "message_ids": [],
+          "inspected_ranges": [
+            {
+              "start_message_id": "msg_demo_1",
+              "end_message_id": "msg_demo_4"
+            }
+          ]
+        }
+      }
+    ],
+    "scores": [
+      {
+        "criterion_id": "c01",
+        "weight": 10,
+        "raw_points": 10,
+        "effective_weight": 16.666666666666668,
+        "points": 16.666666666666668
+      },
+      {
+        "criterion_id": "c02",
+        "weight": 15,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      },
+      {
+        "criterion_id": "c03",
+        "weight": 20,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      },
+      {
+        "criterion_id": "c04",
+        "weight": 20,
+        "raw_points": 20.0,
+        "effective_weight": 33.333333333333336,
+        "points": 33.333333333333336
+      },
+      {
+        "criterion_id": "c05",
+        "weight": 15,
+        "raw_points": 15,
+        "effective_weight": 25.0,
+        "points": 25.0
+      },
+      {
+        "criterion_id": "c06",
+        "weight": 15,
+        "raw_points": 15.0,
+        "effective_weight": 25.0,
+        "points": 25.0
+      },
+      {
+        "criterion_id": "c07",
+        "weight": 5,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      },
+      {
+        "criterion_id": "c08",
+        "weight": 0,
+        "raw_points": null,
+        "effective_weight": null,
+        "points": null
+      }
+    ],
+    "sections": [
+      {
+        "section_id": "start",
+        "points": 16.666666666666668,
+        "maximum": 16.666666666666668
+      },
+      {
+        "section_id": "safety",
+        "points": 33.333333333333336,
+        "maximum": 33.333333333333336
+      },
+      {
+        "section_id": "dialogue",
+        "points": 50.0,
+        "maximum": 50.0
+      },
+      {
+        "section_id": "gross",
+        "points": null,
+        "maximum": null
+      }
+    ],
+    "applicable_weight": 60,
+    "total": 100.0,
+    "total_unavailable_reason": null,
+    "gross_error": false
+  }
+}
