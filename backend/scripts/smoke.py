@@ -29,7 +29,7 @@ def run(base_url, new_criterion=False):
             extra.update(criterion_id='smoke_new_'+uuid4().hex,wording='The operator does not ask for private credentials when giving general tariff navigation.',weight=5)
             config['criteria'].append(extra)
             selected=request('POST','/api/v1/checklists',config)
-        upload=json.loads((fixtures/'upload-request.json').read_text())
+        upload=json.loads((fixtures/'upload-request.json').read_text(encoding='utf-8'))
         upload['conversation_id']='live-smoke-'+uuid4().hex
         conv=request('POST','/api/v1/conversations',upload)
         ev=request('POST','/api/v1/evaluations',dict(conversation_id=conv['conversation_id'],checklist_id=selected['checklist_id'],checklist_version=selected['version']))
