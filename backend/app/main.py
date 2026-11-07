@@ -11,8 +11,9 @@ from starlette.exceptions import HTTPException
 from .config import Settings
 from .db import Store
 from .errors import APIError
-from .models import ImportRequest, SourceRecord, ChecklistInput, ChecklistUpdate
+from .models import ImportRequest, SourceRecord, ChecklistInput, ChecklistUpdate, EvaluationRequest
 from . import checklists
+from .evaluations import Evaluator
 from .organizer import import_group
 
 
@@ -21,9 +22,15 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
     store = Store(settings.database_path)
     checklists.seed(store)
 
+    evaluator = Evaluator(store, settings, provider_transport)
+
     @asynccontextmanager
     async def lifespan(app):
-        yield
+        await evaluator.start()
+        try:
+            yield
+        finally:
+            await evaluator.stop()
 
     app = FastAPI(title='Freedom Broker CQA', version='1.0.0', lifespan=lifespan)
     app.state.store = store
@@ -128,5 +135,27 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
                 raise APIError(409,'version_conflict','Checklist version changed; reload before saving.')
             db.execute('UPDATE checklists SET archived=1 WHERE id=?',(id,))
         return Response(status_code=204)
+
+    @app.post('/api/v1/evaluations', status_code=202)
+    async def evaluate(body: EvaluationRequest, response: Response):
+        doc=evaluator.create(body)
+        response.headers['Location']='/api/v1/evaluations/'+doc['evaluation_id']
+        return doc
+
+    @app.get('/api/v1/evaluations')
+    def list_evaluations(conversation_id: str | None = None):
+        import json
+        with store.transaction() as db:
+            if conversation_id is not None:
+                store.get(db,'conversations',conversation_id)
+                rows=db.execute('SELECT document FROM evaluations WHERE conversation_id=? ORDER BY seq',(conversation_id,))
+            else:
+                rows=db.execute('SELECT document FROM evaluations ORDER BY seq')
+            return {'items':[json.loads(r['document']) for r in rows]}
+
+    @app.get('/api/v1/evaluations/{id}')
+    def evaluation(id: str):
+        with store.transaction() as db:
+            return store.get(db,'evaluations',id)
 
     return app
