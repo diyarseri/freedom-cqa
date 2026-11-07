@@ -33,7 +33,7 @@ def run(base_url, new_criterion=False):
         upload['conversation_id']='live-smoke-'+uuid4().hex
         conv=request('POST','/api/v1/conversations',upload)
         ev=request('POST','/api/v1/evaluations',dict(conversation_id=conv['conversation_id'],checklist_id=selected['checklist_id'],checklist_version=selected['version']))
-        deadline=time.monotonic()+150
+        deadline=time.monotonic()+360
         while ev['status'] in ('queued','running') and time.monotonic()<deadline:
             time.sleep(.25)
             ev=request('GET','/api/v1/evaluations/'+ev['evaluation_id'])

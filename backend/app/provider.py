@@ -1,4 +1,4 @@
-"""Real OpenAI Chat Completions adapter, with a shared two-call budget."""
+"""Real OpenAI or local Ollama adapter, with a shared two-call budget."""
 import asyncio
 import copy
 import json
@@ -66,24 +66,86 @@ def usage_cost(usage, model, base_url):
 
 
 class OpenAIProvider:
-    name = 'openai'
-
     def __init__(self, settings, transport=None):
         self.settings = settings
         self.transport = transport
 
+    @property
+    def name(self):
+        return self.settings.provider_kind
+
+    def _validate_endpoint(self):
+        cfg = self.settings
+        base = urlsplit(cfg.provider_base_url)
+        common_invalid = not base.hostname or base.username or base.password or base.query or base.fragment
+        if cfg.provider_kind == 'ollama':
+            if common_invalid or base.scheme != 'http' or base.hostname not in ('127.0.0.1', 'localhost'):
+                raise ProviderFailure(
+                    'provider_auth',
+                    'Ollama must use a loopback HTTP URL such as http://127.0.0.1:11434.',
+                )
+        elif common_invalid or base.scheme != 'https':
+            raise ProviderFailure('provider_auth', 'Configure a valid HTTPS provider base URL.')
+        return base
+
+    def _request(self, messages, schema):
+        cfg = self.settings
+        if cfg.provider_kind == 'ollama':
+            return (
+                cfg.provider_base_url.rstrip('/') + '/api/chat',
+                {},
+                dict(
+                    model=cfg.provider_model,
+                    messages=messages,
+                    stream=False,
+                    think=False,
+                    format=schema,
+                    options=dict(temperature=0, num_predict=cfg.max_output_tokens),
+                ),
+            )
+        return (
+            cfg.provider_base_url.rstrip('/') + '/chat/completions',
+            {'Authorization': 'Bearer ' + cfg.provider_api_key},
+            dict(
+                model=cfg.provider_model,
+                messages=messages,
+                max_completion_tokens=cfg.max_output_tokens,
+                store=False,
+                response_format=dict(
+                    type='json_schema',
+                    json_schema=dict(name='criterion_judgments', strict=True, schema=schema),
+                ),
+            ),
+        )
+
+    def _response(self, body):
+        """Return raw judgment JSON and normalized usage from a provider envelope."""
+        cfg = self.settings
+        if cfg.provider_kind == 'ollama':
+            if body.get('done') is not True or body.get('done_reason') != 'stop':
+                raise InvalidJudgment('Provider returned incomplete output')
+            usage = dict(
+                prompt_tokens=body.get('prompt_eval_count'),
+                completion_tokens=body.get('eval_count'),
+                prompt_tokens_details=dict(cached_tokens=body.get('prompt_eval_cached_count', 0)),
+            )
+            return body['message']['content'], usage
+        choice = body['choices'][0]
+        if choice.get('finish_reason') != 'stop' or choice['message'].get('refusal'):
+            raise InvalidJudgment('Provider refused or returned incomplete output')
+        return choice['message']['content'], body.get('usage')
+
     async def evaluate(self, checklist, conversation, audit):
         cfg = self.settings
-        if not cfg.provider_api_key:
+        if cfg.provider_kind == 'openai' and not cfg.provider_api_key:
             raise ProviderFailure('provider_auth', 'Configure OPENAI_API_KEY server-side.')
-        base = urlsplit(cfg.provider_base_url)
-        if base.scheme != 'https' or not base.hostname or base.username or base.password or base.query or base.fragment:
-            raise ProviderFailure('provider_auth', 'Configure a valid HTTPS provider base URL.')
+        self._validate_endpoint()
         schema = copy.deepcopy(ProviderJudgments.model_json_schema())
         schema['$defs']['Judgment']['properties']['criterion_id']['enum'] = [c['criterion_id'] for c in checklist['criteria']]
         messages = [
             dict(role='system', content=SYSTEM),
             dict(role='system', content='Saved checklist configuration (authoritative criteria):\n'+json.dumps(checklist, ensure_ascii=False)),
+            dict(role='system', content='Required response JSON schema:\n'+json.dumps(schema, ensure_ascii=False)),
             dict(role='user', content=json.dumps({'untrusted_conversation_evidence': conversation}, ensure_ascii=False)),
         ]
         mode = 'initial'
@@ -98,11 +160,8 @@ class OpenAIProvider:
                 async with asyncio.timeout(cfg.provider_timeout):
                     async with httpx.AsyncClient(timeout=cfg.provider_timeout, transport=self.transport,
                                                  follow_redirects=False) as client:
-                        response = await client.post(cfg.provider_base_url.rstrip('/')+'/chat/completions',
-                            headers={'Authorization': 'Bearer '+cfg.provider_api_key},
-                            json=dict(model=cfg.provider_model, messages=messages,
-                                      max_completion_tokens=cfg.max_output_tokens, store=False,
-                                      response_format=dict(type='json_schema', json_schema=dict(name='criterion_judgments', strict=True, schema=schema))))
+                        url, headers, request_body = self._request(messages, schema)
+                        response = await client.post(url, headers=headers, json=request_body)
                 record['http_status'] = response.status_code
                 record['request_id'] = response.headers.get('x-request-id')
                 retry_after = response.headers.get('retry-after')
@@ -134,13 +193,10 @@ class OpenAIProvider:
                 if not isinstance(body, dict):
                     raise InvalidJudgment('Provider returned invalid response envelope')
                 record['model_returned'] = body.get('model')
-                record['usage'] = body.get('usage')
-                record['estimated_cost_usd'] = usage_cost(body.get('usage'), body.get('model'), cfg.provider_base_url)
                 try:
-                    choice = body['choices'][0]
-                    if choice.get('finish_reason') != 'stop' or choice['message'].get('refusal'):
-                        raise InvalidJudgment('Provider refused or returned incomplete output')
-                    raw = choice['message']['content']
+                    raw, usage = self._response(body)
+                    record['usage'] = usage
+                    record['estimated_cost_usd'] = usage_cost(usage, body.get('model'), cfg.provider_base_url)
                     parsed = ProviderJudgments.model_validate_json(raw)
                     judgments = validate_judgments(parsed.judgments, checklist, conversation)
                 except (KeyError, IndexError, TypeError, ValidationError):
