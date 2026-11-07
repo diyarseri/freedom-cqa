@@ -11,8 +11,8 @@ from starlette.exceptions import HTTPException
 from .config import Settings
 from .db import Store
 from .errors import APIError
-from .models import ImportRequest, SourceRecord, ChecklistInput, ChecklistUpdate, EvaluationRequest
-from . import checklists
+from .models import ImportRequest, SourceRecord, ChecklistInput, ChecklistUpdate, EvaluationRequest, AppealRequest, DecisionRequest
+from . import checklists, reviews
 from .evaluations import Evaluator
 from .organizer import import_group
 
@@ -67,7 +67,8 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
         details = [dict(path='.'.join(str(x) for x in e['loc']), message=e['msg']) for e in exc.errors()]
-        return error_response(request, APIError(422, 'validation_error', 'Request validation failed.', details))
+        code = 'invalid_judgment' if request.url.path.endswith('/decision') and any('replacement' in e['loc'] for e in exc.errors()) else 'validation_error'
+        return error_response(request, APIError(422, code, 'Request validation failed.', details))
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
@@ -157,5 +158,25 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
     def evaluation(id: str):
         with store.transaction() as db:
             return store.get(db,'evaluations',id)
+
+    @app.post('/api/v1/evaluations/{id}/appeals',status_code=201)
+    def appeal(id: str, body: AppealRequest):
+        return reviews.submit(store,id,body)
+
+    @app.get('/api/v1/appeals')
+    def list_appeals(status: Literal['pending','resolved'] | None = None):
+        import json
+        with store.transaction() as db:
+            docs=[json.loads(r['document']) for r in db.execute('SELECT document FROM appeals ORDER BY seq')]
+            return {'items':[d for d in docs if status is None or d['status']==status]}
+
+    @app.get('/api/v1/appeals/{id}')
+    def get_appeal(id: str):
+        with store.transaction() as db:
+            return store.get(db,'appeals',id)
+
+    @app.post('/api/v1/appeals/{id}/decision')
+    def decision(id: str, body: DecisionRequest):
+        return reviews.decide(store,id,body)
 
     return app
