@@ -13,7 +13,13 @@ from conftest import fixture
 def model_reply(request, mutate=None):
     payload=json.loads(request.content)
     checklist=json.loads(payload['messages'][1]['content'].split('\n',1)[1])
-    conv=json.loads(payload['messages'][2]['content'])['untrusted_conversation_evidence']
+    conv=next(
+        parsed['untrusted_conversation_evidence']
+        for message in payload['messages']
+        if message['role']=='user'
+        for parsed in [json.loads(message['content'])]
+        if isinstance(parsed,dict) and 'untrusted_conversation_evidence' in parsed
+    )
     ids=[m['message_id'] for m in conv['messages']]
     mapped={f'msg_demo_{i}':id for i,id in enumerate(ids,1)}
     judgments=fixture('evaluation-original')['original_ai_result']['judgments']
@@ -62,7 +68,7 @@ def test_success_real_adapter_pipeline_and_audit(settings):
         assert result['original_ai_result']['total']==92.31
         assert result['original_ai_result']==result['final_result']
         assert 'UNTRUSTED' in seen[0]['messages'][0]['content']
-        assert seen[0]['messages'][2]['role']=='user'
+        assert seen[0]['messages'][-1]['role']=='user'
         assert seen[0]['response_format']['json_schema']['strict'] is True
         assert seen[0]['store'] is False
         with c.app.state.store.transaction() as db:
@@ -190,3 +196,42 @@ def test_restart_marks_interrupted_work_failed_without_replay(settings):
         interrupted=c.get('/api/v1/evaluations/'+e['evaluation_id']).json()
         assert interrupted['status']=='failed' and interrupted['final_result'] is None
         assert interrupted['provider']['error']['code']=='provider_unavailable'
+
+
+def test_local_ollama_native_structured_output_needs_no_api_key(settings):
+    seen=[]
+    def ollama(request):
+        payload=json.loads(request.content)
+        seen.append((request,payload))
+        openai_style=model_reply(request).json()
+        content=openai_style['choices'][0]['message']['content']
+        return httpx.Response(200,json=dict(
+            model='qwen3:8b',message=dict(role='assistant',content=content),
+            done=True,done_reason='stop',prompt_eval_count=2000,
+            prompt_eval_cached_count=100,eval_count=600))
+    cfg=replace(settings,provider_kind='ollama',provider_api_key='',provider_model='qwen3:8b',
+                provider_base_url='http://127.0.0.1:11434',provider_timeout=120)
+    with TestClient(create_app(cfg,provider_transport=httpx.MockTransport(ollama))) as c:
+        result=submit(c)
+        assert result['status']=='succeeded'
+        assert result['provider']['name']=='ollama'
+        assert result['provider']['model']=='qwen3:8b'
+        request,payload=seen[0]
+        assert request.url.path=='/api/chat'
+        assert 'authorization' not in request.headers
+        assert payload['stream'] is False and payload['think'] is False
+        assert payload['format']['type']=='object'
+        assert payload['options']['num_predict']==cfg.max_output_tokens
+        with c.app.state.store.transaction() as db:
+            audit=json.loads(db.execute('SELECT document FROM provider_calls').fetchone()[0])
+            assert audit['usage']['prompt_tokens']==2000
+            assert audit['estimated_cost_usd'] is None
+
+
+def test_ollama_rejects_non_loopback_or_https_endpoint(settings):
+    for url in ('http://example.com:11434','https://127.0.0.1:11434'):
+        cfg=replace(settings,provider_kind='ollama',provider_model='qwen3:8b',provider_base_url=url)
+        with TestClient(create_app(cfg)) as c:
+            result=submit(c)
+            assert result['status']=='failed'
+            assert result['provider']['error']['code']=='provider_auth'

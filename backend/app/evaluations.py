@@ -44,7 +44,7 @@ class Evaluator:
             checklists.version(db,request.checklist_id,request.checklist_version)
             doc = dict(evaluation_id=new_id('eval'),conversation_id=request.conversation_id,
                        checklist_id=request.checklist_id,checklist_version=request.checklist_version,
-                       status='queued',provider=dict(name='openai',model=self.settings.provider_model,error=None),
+                       status='queued',provider=dict(name=self.provider.name,model=self.settings.provider_model,error=None),
                        created_at=now(),completed_at=None,revision=1,original_ai_result=None,appeals=[],final_result=None)
             db.execute('INSERT INTO evaluations(id,conversation_id,checklist_id,checklist_version,document) VALUES(?,?,?,?,?)',
                        (doc['evaluation_id'],request.conversation_id,request.checklist_id,request.checklist_version,dump(doc)))
