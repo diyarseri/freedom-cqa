@@ -1,0 +1,22 @@
+{
+  "evaluation_id": "eval_failed",
+  "conversation_id": "conv_demo",
+  "checklist_id": "checklist_seed",
+  "checklist_version": 1,
+  "status": "failed",
+  "provider": {
+    "name": "example",
+    "model": "configured-model",
+    "error": {
+      "code": "provider_timeout",
+      "message": "Provider deadline exceeded.",
+      "retryable": true
+    }
+  },
+  "created_at": "2026-11-07T08:00:00Z",
+  "completed_at": "2026-11-07T08:00:01Z",
+  "revision": 1,
+  "original_ai_result": null,
+  "appeals": [],
+  "final_result": null
+}

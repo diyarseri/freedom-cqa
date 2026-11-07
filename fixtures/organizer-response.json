@@ -1,0 +1,38 @@
+{
+  "error": "",
+  "isSuccess": true,
+  "data": {
+    "dataset_group_id": "DEMO",
+    "total_records": 1,
+    "records": [
+      {
+        "conversation_id": "demo-ru-001",
+        "channel": "agent chat",
+        "language": "RU",
+        "audio_url": null,
+        "transcript": [
+          {
+            "timestamp": "00:00",
+            "speaker": "client",
+            "text": "Здравствуйте, где посмотреть тарифы?"
+          },
+          {
+            "timestamp": "00:02",
+            "speaker": "operator",
+            "text": "Здравствуйте! Я Анна. Тарифы доступны в разделе «Тарифы» приложения."
+          },
+          {
+            "timestamp": "00:04",
+            "speaker": "client",
+            "text": "Спасибо."
+          },
+          {
+            "timestamp": "00:05",
+            "speaker": "system",
+            "text": "Чат закрыт."
+          }
+        ]
+      }
+    ]
+  }
+}
