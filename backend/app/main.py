@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,13 +11,15 @@ from starlette.exceptions import HTTPException
 from .config import Settings
 from .db import Store
 from .errors import APIError
-from .models import ImportRequest, SourceRecord
+from .models import ImportRequest, SourceRecord, ChecklistInput, ChecklistUpdate
+from . import checklists
 from .organizer import import_group
 
 
 def create_app(settings=None, *, organizer_transport=None, provider_transport=None):
     settings = settings or Settings.from_env()
     store = Store(settings.database_path)
+    checklists.seed(store)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -88,5 +90,43 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
     @app.post('/api/v1/dataset-imports', status_code=201)
     def dataset_import(body: ImportRequest):
         return import_group(store, settings, body.group_id, organizer_transport)
+
+    @app.post('/api/v1/checklists', status_code=201)
+    def create_checklist(body: ChecklistInput):
+        with store.transaction() as db:
+            return checklists.create(db, body)
+
+    @app.get('/api/v1/checklists')
+    def list_checklists():
+        with store.transaction() as db:
+            rows = db.execute('SELECT id,latest FROM checklists WHERE archived=0 ORDER BY id').fetchall()
+            return {'items': [checklists.version(db,r['id'],r['latest']) for r in rows]}
+
+    @app.get('/api/v1/checklists/{id}/versions')
+    def checklist_versions(id: str):
+        import json
+        with store.transaction() as db:
+            checklists.head(db,id)
+            return {'items': [json.loads(r['document']) for r in db.execute(
+                'SELECT document FROM checklist_versions WHERE checklist_id=? ORDER BY version', (id,))]}
+
+    @app.get('/api/v1/checklists/{id}/versions/{version}')
+    def checklist_version(id: str, version: int):
+        with store.transaction() as db:
+            return checklists.version(db,id,version)
+
+    @app.put('/api/v1/checklists/{id}', status_code=201)
+    def update_checklist(id: str, body: ChecklistUpdate):
+        with store.transaction() as db:
+            return checklists.update(db,id,body.expected_version,body.configuration)
+
+    @app.delete('/api/v1/checklists/{id}', status_code=204)
+    def archive_checklist(id: str, expected_version: int = Query(..., ge=1)):
+        with store.transaction() as db:
+            row=checklists.head(db,id,active=True)
+            if row['latest'] != expected_version:
+                raise APIError(409,'version_conflict','Checklist version changed; reload before saving.')
+            db.execute('UPDATE checklists SET archived=1 WHERE id=?',(id,))
+        return Response(status_code=204)
 
     return app
