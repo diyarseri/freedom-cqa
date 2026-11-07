@@ -9,7 +9,7 @@ from .models import ChecklistInput
 def seed(store):
     # Read the committed normative seed; no duplicate hardcoded interpretation.
     path = Path(__file__).resolve().parents[2] / 'fixtures' / 'checklist.json'
-    doc = json.loads(path.read_text())
+    doc = json.loads(path.read_text(encoding='utf-8'))
     ChecklistInput.model_validate({k: doc[k] for k in ('name', 'sections', 'criteria')})
     with store.transaction() as db:
         if not db.execute('SELECT 1 FROM checklists WHERE id=?', (doc['checklist_id'],)).fetchone():
