@@ -1,4 +1,5 @@
 """Server-only GET adapter. Never log the signed upstream URL or response."""
+import asyncio
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
@@ -16,14 +17,15 @@ def dataset_url(url, group_id):
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query + [('group_id', group_id)]), ''))
 
 
-def import_group(store, settings, group_id, transport=None):
+async def import_group(store, settings, group_id, transport=None):
     if not settings.organizer_url:
         raise APIError(503, 'organizer_not_configured', 'Configure ORGANIZER_DATASET_URL server-side.')
     url = dataset_url(settings.organizer_url, group_id)
     try:
         # No automatic retries or redirects: do not replay or disclose signed URLs.
-        with httpx.Client(timeout=settings.organizer_timeout, transport=transport, follow_redirects=False) as client:
-            response = client.get(url)
+        async with asyncio.timeout(settings.organizer_timeout):
+            async with httpx.AsyncClient(timeout=settings.organizer_timeout, transport=transport, follow_redirects=False) as client:
+                response = await client.get(url)
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict) or payload.get('isSuccess') is not True:
@@ -36,7 +38,7 @@ def import_group(store, settings, group_id, transport=None):
         records = [SourceRecord.model_validate(r) for r in data['records']]
         if len({r.conversation_id for r in records}) != len(records):
             raise ValueError('Duplicate source IDs')
-    except httpx.TimeoutException:
+    except (TimeoutError, httpx.TimeoutException):
         raise APIError(504, 'organizer_timeout', 'Organizer request timed out.') from None
     except (httpx.HTTPError, ValueError, KeyError, TypeError, ValidationError):
         raise APIError(502, 'organizer_failure', 'Organizer response failed validation or was unavailable.') from None

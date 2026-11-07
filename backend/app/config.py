@@ -1,14 +1,14 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
 class Settings:
     database_path: str = 'backend/data/cqa.sqlite3'
-    organizer_url: str = ''
+    organizer_url: str = field(default='', repr=False)
     organizer_timeout: float = 20
-    provider_api_key: str = ''
-    provider_model: str = 'gpt-4.1-mini-2025-04-14'
+    provider_api_key: str = field(default='', repr=False)
+    provider_model: str = 'gpt-5.4-mini-2026-03-17'
     provider_base_url: str = 'https://api.openai.com/v1'
     provider_timeout: float = 45
     max_output_tokens: int = 8000

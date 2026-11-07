@@ -17,7 +17,7 @@ class Evaluator:
         self.queue = asyncio.Queue()
         self.workers = []
 
-    async def start(self):
+    def interrupt_incomplete(self):
         # Interrupted work fails visibly; never replay a possibly billed call automatically.
         with self.store.transaction() as db:
             for row in db.execute('SELECT document FROM evaluations').fetchall():
@@ -26,12 +26,16 @@ class Evaluator:
                     doc.update(status='failed', completed_at=now())
                     doc['provider']['error'] = dict(code='provider_unavailable', message='Evaluation interrupted by server restart; submit a new attempt.', retryable=True)
                     self.store.save(db,'evaluations',doc,'evaluation_id')
+
+    async def start(self):
+        self.interrupt_incomplete()
         self.workers = [asyncio.create_task(self.worker()) for _ in range(2)]
 
     async def stop(self):
         for w in self.workers:
             w.cancel()
         await asyncio.gather(*self.workers, return_exceptions=True)
+        self.interrupt_incomplete()
 
     def create(self, request):
         with self.store.transaction() as db:

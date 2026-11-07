@@ -27,7 +27,7 @@ def model_reply(request, mutate=None):
             r.update(start_message_id=mapped[r['start_message_id']],end_message_id=mapped[r['end_message_id']])
         js.append(j)
     if mutate:mutate(js)
-    body=dict(model='gpt-4.1-mini-2025-04-14',choices=[dict(finish_reason='stop',message=dict(content=json.dumps({'judgments':js})))],
+    body=dict(model=payload['model'],choices=[dict(finish_reason='stop',message=dict(content=json.dumps({'judgments':js})))],
               usage=dict(prompt_tokens=2000,completion_tokens=600,prompt_tokens_details=dict(cached_tokens=100)))
     return httpx.Response(200,json=body,headers={'x-request-id':'upstream-test'})
 
@@ -67,7 +67,7 @@ def test_success_real_adapter_pipeline_and_audit(settings):
         assert seen[0]['store'] is False
         with c.app.state.store.transaction() as db:
             raw=json.loads(db.execute('SELECT document FROM provider_calls').fetchone()[0])
-            assert raw['usage']['prompt_tokens']==2000 and raw['model_returned']=='gpt-4.1-mini-2025-04-14'
+            assert raw['usage']['prompt_tokens']==2000 and raw['model_returned']==cfg.provider_model
             assert raw['estimated_cost_usd']>0 and raw['raw_response']['choices']
     # A fresh process/factory sees completed results, not a regenerated model answer.
     with TestClient(create_app(cfg)) as c:
@@ -151,3 +151,42 @@ def test_timeout_is_bounded(settings):
         result=submit(c)
         assert result['provider']['error']['code']=='provider_timeout'
         assert result['status']=='failed' and len(calls)==2
+
+
+def test_long_retry_after_stops_without_early_retry(settings):
+    seen=[]
+    def upstream(req):
+        seen.append(req)
+        return httpx.Response(429,headers={'Retry-After':'120'})
+    with TestClient(create_app(replace(settings,provider_api_key='test-only'),provider_transport=httpx.MockTransport(upstream))) as c:
+        result=submit(c)
+        assert len(seen)==1 and result['provider']['error']['code']=='provider_rate_limited'
+        assert result['provider']['error']['retryable'] is True
+
+
+def test_malformed_and_truncated_outputs_fail_safely(settings):
+    for malformed in [None,[],{'choices':[]}, {'choices':[{'finish_reason':'length','message':{'content':'{}'}}]}]:
+        def upstream(req):
+            return httpx.Response(200,json=malformed) if malformed is not None else httpx.Response(200,text='not JSON')
+        with TestClient(create_app(replace(settings,provider_api_key='test-only'),provider_transport=httpx.MockTransport(upstream))) as c:
+            result=submit(c)
+            assert result['status']=='failed'
+            assert result['provider']['error']['code']=='provider_invalid_output'
+            assert result['final_result'] is None
+
+
+def test_restart_marks_interrupted_work_failed_without_replay(settings):
+    from app.db import Store,dump
+    cfg=replace(settings,provider_api_key='test-only')
+    with TestClient(create_app(cfg,provider_transport=httpx.MockTransport(model_reply))) as c:
+        e=submit(c)
+    store=Store(cfg.database_path)
+    e.update(status='running',original_ai_result=None,final_result=None,completed_at=None)
+    with store.transaction() as db:
+        store.save(db,'evaluations',e,'evaluation_id')
+    def forbidden(req):
+        raise AssertionError('Restart must not replay a potentially billed call')
+    with TestClient(create_app(cfg,provider_transport=httpx.MockTransport(forbidden))) as c:
+        interrupted=c.get('/api/v1/evaluations/'+e['evaluation_id']).json()
+        assert interrupted['status']=='failed' and interrupted['final_result'] is None
+        assert interrupted['provider']['error']['code']=='provider_unavailable'

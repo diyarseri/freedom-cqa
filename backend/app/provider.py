@@ -3,6 +3,7 @@ import asyncio
 import copy
 import json
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 
 import httpx
@@ -45,7 +46,13 @@ class ProviderFailure(Exception):
 
 def usage_cost(usage, model, base_url):
     # Verified default-model rates only; unknown providers/models get null, never guesses.
-    if urlsplit(base_url).hostname != 'api.openai.com' or model not in ('gpt-4.1-mini', 'gpt-4.1-mini-2025-04-14') or not isinstance(usage, dict):
+    rates = {
+        'gpt-5.4-mini': (0.75, 0.075, 4.50),
+        'gpt-5.4-mini-2026-03-17': (0.75, 0.075, 4.50),
+        'gpt-4.1-mini': (0.40, 0.10, 1.60),
+        'gpt-4.1-mini-2025-04-14': (0.40, 0.10, 1.60),
+    }
+    if urlsplit(base_url).hostname != 'api.openai.com' or not isinstance(model, str) or model not in rates or not isinstance(usage, dict):
         return None
     p, c = usage.get('prompt_tokens'), usage.get('completion_tokens')
     if type(p) is not int or type(c) is not int or p < 0 or c < 0:
@@ -54,7 +61,8 @@ def usage_cost(usage, model, base_url):
     cached = details.get('cached_tokens', 0) if isinstance(details, dict) else 0
     if type(cached) is not int or not 0 <= cached <= p:
         cached = 0
-    return ((p-cached)*0.40 + cached*0.10 + c*1.60)/1_000_000
+    input_rate, cached_rate, output_rate = rates[model]
+    return ((p-cached)*input_rate + cached*cached_rate + c*output_rate)/1_000_000
 
 
 class OpenAIProvider:
@@ -84,17 +92,31 @@ class OpenAIProvider:
                           model_returned=None, usage=None, estimated_cost_usd=None, request_id=None,
                           raw_response=None, outcome=None)
             error = None
+            retry_delay = 0.25
+            allow_retry = True
             try:
                 async with asyncio.timeout(cfg.provider_timeout):
                     async with httpx.AsyncClient(timeout=cfg.provider_timeout, transport=self.transport,
                                                  follow_redirects=False) as client:
                         response = await client.post(cfg.provider_base_url.rstrip('/')+'/chat/completions',
                             headers={'Authorization': 'Bearer '+cfg.provider_api_key},
-                            json=dict(model=cfg.provider_model, messages=messages, temperature=0,
-                                      max_tokens=cfg.max_output_tokens, store=False,
+                            json=dict(model=cfg.provider_model, messages=messages,
+                                      max_completion_tokens=cfg.max_output_tokens, store=False,
                                       response_format=dict(type='json_schema', json_schema=dict(name='criterion_judgments', strict=True, schema=schema))))
                 record['http_status'] = response.status_code
                 record['request_id'] = response.headers.get('x-request-id')
+                retry_after = response.headers.get('retry-after')
+                if response.status_code in (429,503) and retry_after:
+                    try:
+                        retry_delay = max(0.25, float(retry_after))
+                    except ValueError:
+                        try:
+                            retry_delay = max(0.25, (parsedate_to_datetime(retry_after)-datetime.now(timezone.utc)).total_seconds())
+                        except (ValueError, TypeError, OverflowError):
+                            retry_delay = 0.25
+                    # Honor long Retry-After by stopping, not by retrying too early.
+                    if retry_delay > 2:
+                        allow_retry = False
                 if response.status_code in (401,403):
                     raise ProviderFailure('provider_auth', 'Provider credentials were rejected.')
                 if response.status_code == 429:
@@ -141,10 +163,10 @@ class OpenAIProvider:
                 error = exc
             record['outcome'] = error.error['code']
             audit(record)
-            if attempt == 1 or (not error.error['retryable'] and mode != 'repair'):
+            if attempt == 1 or not allow_retry or (not error.error['retryable'] and mode != 'repair'):
                 raise error
             # No hidden SDK retries. One remaining call: either transport retry or repair.
             if mode != 'repair':
                 mode = 'retry'
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(retry_delay)
         raise ProviderFailure('provider_unavailable', 'Provider call budget exhausted.')

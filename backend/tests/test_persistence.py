@@ -64,3 +64,11 @@ def test_errors_are_envelopes(client):
         assert response.status_code in (404,422)
         assert set(response.json()) == {'error','request_id'}
     assert client.post('/api/v1/conversations',json={}).status_code == 422
+
+
+def test_unknown_fields_error_paths_and_method(client):
+    data=fixture('upload-request');data['unexpected']='secret'
+    r=client.post('/api/v1/conversations',json=data)
+    assert r.status_code==422 and r.json()['error']['details'][0]['path']=='unexpected'
+    r=client.put('/api/v1/conversations',json={})
+    assert r.status_code==405 and r.json()['error']['code']=='method_not_allowed'

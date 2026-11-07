@@ -134,6 +134,8 @@ class ChecklistInput(Model):
             raise ValueError('Duplicate section or criterion ID')
         if any(c.section_id is not None and c.section_id not in sections for c in self.criteria):
             raise ValueError('Unknown section ID')
+        if not math.isfinite(sum(c.weight for c in self.criteria if c.effect == 'score')):
+            raise ValueError('Aggregate scoring weight must be finite')
         if sum(c.effect == 'gross_error' for c in self.criteria) > 1:
             raise ValueError('At most one gross-error criterion')
         return self

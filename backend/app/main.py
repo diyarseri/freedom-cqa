@@ -45,7 +45,7 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
             '/api/v1/conversations': {'group_id', 'language'},
             '/api/v1/evaluations': {'conversation_id'},
             '/api/v1/appeals': {'status'},
-        }.get(request.url.path, set())
+        }.get(request.url.path, set()) if request.method == 'GET' else set()
         if request.method == 'DELETE' and request.url.path.startswith('/api/v1/checklists/'):
             allowed = {'expected_version'}
         if any(k not in allowed for k in request.query_params) or any(len(request.query_params.getlist(k)) > 1 for k in request.query_params):
@@ -66,7 +66,14 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
-        details = [dict(path='.'.join(str(x) for x in e['loc']), message=e['msg']) for e in exc.errors()]
+        def property_path(location):
+            path = ''
+            for part in location:
+                if part in ('body', 'query', 'path') and not path:
+                    continue
+                path += f'[{part}]' if isinstance(part, int) else ('.' if path else '') + str(part)
+            return path
+        details = [dict(path=property_path(e['loc']), message=e['msg']) for e in exc.errors()]
         code = 'invalid_judgment' if request.url.path.endswith('/decision') and any('replacement' in e['loc'] for e in exc.errors()) else 'validation_error'
         return error_response(request, APIError(422, code, 'Request validation failed.', details))
 
@@ -96,8 +103,8 @@ def create_app(settings=None, *, organizer_transport=None, provider_transport=No
             return store.get(db, 'conversations', id)
 
     @app.post('/api/v1/dataset-imports', status_code=201)
-    def dataset_import(body: ImportRequest):
-        return import_group(store, settings, body.group_id, organizer_transport)
+    async def dataset_import(body: ImportRequest):
+        return await import_group(store, settings, body.group_id, organizer_transport)
 
     @app.post('/api/v1/checklists', status_code=201)
     def create_checklist(body: ChecklistInput):

@@ -38,3 +38,13 @@ def test_invalid_configuration(client):
     ]:
         c=config();mutate(c)
         assert client.post('/api/v1/checklists',json=c).status_code==422
+
+
+def test_replacement_criterion_configuration_needs_no_code_edit(client):
+    new=config()
+    new['criteria'][0].update(criterion_id='replaced_contact',answer_type='numeric',allowed_numeric_values=[0,1,3],maximum=3,
+                             scale=[{'value':v,'wording':f'Configuration anchor {v}'} for v in [0,1,3]])
+    r=client.put('/api/v1/checklists/checklist_seed',json=dict(expected_version=1,configuration=new))
+    assert r.status_code==201 and r.json()['criteria'][0]['criterion_id']=='replaced_contact'
+    assert r.json()['criteria'][0]['allowed_numeric_values']==[0,1,3]
+    assert client.get('/api/v1/checklists/checklist_seed/versions/1').json()['criteria'][0]['criterion_id']=='c01'

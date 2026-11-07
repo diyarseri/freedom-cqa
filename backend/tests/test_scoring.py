@@ -60,3 +60,12 @@ def test_new_criterion_and_half_up():
     c['criteria'][0]['weight']=1
     c['criteria'][1]['weight']=31
     assert calculate(c,j,conv)['total']==3.13 # 3.125 must round half up
+
+
+def test_all_na_no_applicable_weight_and_no_gross_criterion():
+    c,j,conv=inputs()
+    c['criteria']=[c['criteria'][1]]
+    j=[j[1]]
+    result=calculate(c,j,conv)
+    assert result['total'] is None and result['total_unavailable_reason']=='no_applicable_weight'
+    assert result['gross_error'] is None and all(s['points'] is None for s in result['sections'])
